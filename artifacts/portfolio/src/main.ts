@@ -248,8 +248,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function initThreeJS() {
-        if (window.innerWidth <= 768) return; 
-        
         const container = document.getElementById('threejs-bg');
         if (!container) return;
         
@@ -271,8 +269,8 @@ document.addEventListener('DOMContentLoaded', () => {
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         container.appendChild(renderer.domElement);
         
-        // Scene 1: Particles
-        const particleCount = 300; // Optimized
+        // Scene 1: Particles — fewer on mobile for smooth 60fps
+        const particleCount = window.innerWidth <= 768 ? 150 : 300;
         const particlesGeo = new THREE.BufferGeometry();
         const posArray = new Float32Array(particleCount * 3);
         const colorArray = new Float32Array(particleCount * 3);
