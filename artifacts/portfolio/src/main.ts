@@ -317,13 +317,69 @@ document.addEventListener('DOMContentLoaded', () => {
         const lineSystem = new THREE.LineSegments(linesGeo, linesMat);
         scene.add(lineSystem);
 
-        // Scene 2: Hero Torus Knot
-        const knotGeo = new THREE.TorusKnotGeometry(2, 0.5, 100, 16);
-        const knotMat = new THREE.LineBasicMaterial({ color: 0x7C5CFC, transparent: true, opacity: 0.3 });
-        const knotWire = new THREE.WireframeGeometry(knotGeo);
-        const knotMesh = new THREE.LineSegments(knotWire, knotMat);
-        knotMesh.position.set(0, 0, -5);
-        scene.add(knotMesh);
+        // Scene 2: Hero — 3D Network / Systems Architecture
+        // Represents the interconnected digital systems BHALAGANAPATHY M builds
+        const networkGroup = new THREE.Group();
+        networkGroup.position.set(0, 0, -5);
+        scene.add(networkGroup);
+
+        // Build vertex set from a subdivided icosahedron
+        const icoGeo = new THREE.IcosahedronGeometry(2.2, 1);
+        const posAttr = icoGeo.attributes.position;
+        const networkVertices: THREE.Vector3[] = [];
+        const seenKeys = new Set<string>();
+        for (let i = 0; i < posAttr.count; i++) {
+            const v = new THREE.Vector3(posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i));
+            const key = `${v.x.toFixed(2)},${v.y.toFixed(2)},${v.z.toFixed(2)}`;
+            if (!seenKeys.has(key)) { seenKeys.add(key); networkVertices.push(v); }
+        }
+
+        // Glowing nodes at each vertex
+        const nodeMeshes: any[] = [];
+        networkVertices.forEach(v => {
+            const nGeo = new THREE.SphereGeometry(0.07, 8, 8);
+            const nMat = new THREE.MeshBasicMaterial({ color: 0x7C5CFC });
+            const node = new THREE.Mesh(nGeo, nMat);
+            node.position.copy(v);
+            networkGroup.add(node);
+            nodeMeshes.push(node);
+        });
+
+        // Edges between nearby vertices — represent service connections
+        const networkEdges: { a: THREE.Vector3, b: THREE.Vector3 }[] = [];
+        const EDGE_THRESHOLD = 1.85;
+        for (let i = 0; i < networkVertices.length; i++) {
+            for (let j = i + 1; j < networkVertices.length; j++) {
+                if (networkVertices[i].distanceTo(networkVertices[j]) < EDGE_THRESHOLD) {
+                    networkEdges.push({ a: networkVertices[i], b: networkVertices[j] });
+                    const edgeGeo = new THREE.BufferGeometry().setFromPoints([
+                        networkVertices[i].clone(), networkVertices[j].clone()
+                    ]);
+                    const edgeMat = new THREE.LineBasicMaterial({
+                        color: 0x00FFFF, transparent: true, opacity: 0.25,
+                        blending: THREE.AdditiveBlending
+                    });
+                    networkGroup.add(new THREE.Line(edgeGeo, edgeMat));
+                }
+            }
+        }
+
+        // Data packets (small glowing spheres) traveling along edges
+        // Represent data, API calls, automation flows
+        const networkPackets: { mesh: any, edgeIdx: number, t: number, speed: number }[] = [];
+        const PACKET_COUNT = Math.min(networkEdges.length, 14);
+        for (let i = 0; i < PACKET_COUNT; i++) {
+            const pGeo = new THREE.SphereGeometry(0.045, 6, 6);
+            const pMat = new THREE.MeshBasicMaterial({ color: i % 2 === 0 ? 0xffffff : 0x25D366 });
+            const pMesh = new THREE.Mesh(pGeo, pMat);
+            networkGroup.add(pMesh);
+            networkPackets.push({
+                mesh: pMesh,
+                edgeIdx: Math.floor(Math.random() * networkEdges.length),
+                t: Math.random(),
+                speed: 0.006 + Math.random() * 0.008
+            });
+        }
         
         // Scene 3: Floating cubes
         const cubes: any[] = [];
@@ -450,11 +506,29 @@ document.addEventListener('DOMContentLoaded', () => {
             lineSystem.geometry.attributes.position.needsUpdate = true;
             lineSystem.geometry.attributes.color.needsUpdate = true;
 
-            // Knot
-            knotMesh.rotation.x += 0.003;
-            knotMesh.rotation.y += 0.005;
-            knotMesh.position.x += (mouse3D.x * 1.5 - knotMesh.position.x) * 0.05;
-            knotMesh.position.y += (mouse3D.y * 1.5 - knotMesh.position.y) * 0.05;
+            // Network — slow majestic rotation + mouse parallax
+            networkGroup.rotation.x += 0.002;
+            networkGroup.rotation.y += 0.004;
+            networkGroup.position.x += (mouse3D.x * 1.5 - networkGroup.position.x) * 0.05;
+            networkGroup.position.y += (mouse3D.y * 1.5 - networkGroup.position.y) * 0.05;
+
+            // Data packets travel along edges, wrap to a new random edge on completion
+            networkPackets.forEach(p => {
+                p.t += p.speed;
+                if (p.t > 1) {
+                    p.t = 0;
+                    p.edgeIdx = Math.floor(Math.random() * networkEdges.length);
+                }
+                const edge = networkEdges[p.edgeIdx];
+                p.mesh.position.lerpVectors(edge.a, edge.b, p.t);
+            });
+
+            // Pulse node brightness to simulate live activity
+            const pulse = (Math.sin(time * 3) * 0.5 + 0.5);
+            nodeMeshes.forEach((n, idx) => {
+                const scale = 1 + pulse * 0.3 * ((idx % 3 === 0) ? 1 : 0);
+                n.scale.setScalar(scale);
+            });
             
             // Cubes
             cubes.forEach(c => {
